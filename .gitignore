@@ -1,0 +1,19 @@
+# Python - Archivos temporales
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs (los que veo en tu ls)
+logs/
+*.log
+
+# Base de datos (No se sube el archivo .db para evitar conflictos)
+donorlink.db
+
+# Entornos virtuales (por si creas uno después)
+venv/
+.venv/
+env/
+
+# Variables de entorno
+.env
