@@ -37,3 +37,12 @@ def get_summary(
         "donors": StatisticsService.get_donor_statistics(db),
         "donations": StatisticsService.get_donation_statistics(db),
     }
+
+
+@router.get("/extended")
+def get_extended(
+    db: Session = Depends(get_db),
+    _: None = Depends(require_role(UserRole.ADMIN)),
+):
+    """Extended stats: approval status, monthly donations, contact requests"""
+    return StatisticsService.get_extended_stats(db)

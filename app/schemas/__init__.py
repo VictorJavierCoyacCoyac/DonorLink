@@ -44,6 +44,26 @@ class UserLogin(BaseModel):
     password: str = Field(..., description="Password")
 
 
+class ForgotPasswordRequest(BaseModel):
+    """Schema for initiating password recovery"""
+    email: EmailStr = Field(..., description="Email address of the account")
+
+
+class ResetPasswordRequest(BaseModel):
+    """Schema for resetting password with a token"""
+    token: str = Field(..., description="Reset token received via email")
+    new_password: str = Field(..., min_length=8, description="New password")
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        if not any(c.isupper() for c in v):
+            raise ValueError("La contraseña debe contener al menos una letra mayúscula")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("La contraseña debe contener al menos un número")
+        return v
+
+
 class PasswordChangeRequest(BaseModel):
     """Schema for password change request"""
     current_password: str = Field(..., description="Current password")
@@ -317,9 +337,23 @@ class DonorUpdate(BaseModel):
 class DonorResponse(DonorBase):
     """Schema for donor response"""
     id: int
+    user_id: Optional[int] = None
     last_donation_date: Optional[datetime] = None
+    last_donation_volume_ml: Optional[float] = None
+    questionnaire_answers: Optional[Dict[str, str]] = None
+    approval_status: str = "pending"
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("questionnaire_answers", mode="before")
+    @classmethod
+    def parse_questionnaire_answers(cls, value):
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return value
+        return value
 
     class Config:
         from_attributes = True
@@ -327,18 +361,15 @@ class DonorResponse(DonorBase):
 
 class DonationCreate(BaseModel):
     """Schema for registering a new donation"""
-    volume_ml: float = Field(default=450.0, gt=0, le=500, description="Volume in ml (standard: 450ml)")
-    
+    volume_ml: float = Field(default=450.0, gt=0, le=1000, description="Volume in ml (standard: 450ml, max: 1000ml)")
+
     @field_validator("volume_ml")
     @classmethod
     def validate_volume(cls, v: float) -> float:
-        """Validate donation volume"""
-        if v <= 0:
-            raise ValueError("Donation volume must be greater than 0")
-        if v > 500:
-            raise ValueError("Donation volume cannot exceed 500ml")
-        if v < 350:
-            raise ValueError("Minimum donation volume is 350ml")
+        if v < 100:
+            raise ValueError("El volumen mínimo de donación es 100 ml")
+        if v > 1000:
+            raise ValueError("El volumen máximo de donación es 1000 ml")
         return v
 
 
@@ -602,6 +633,7 @@ class DonorRegister(DonorBase):
     """Schema for donor self-registration with account creation"""
     username: str = Field(..., min_length=3, max_length=100, description="Username")
     password: str = Field(..., min_length=8, description="Password")
+    questionnaire_answers: Dict[str, str] = Field(default_factory=dict, description="Questionnaire answers")
 
     @field_validator("username")
     @classmethod
@@ -661,6 +693,25 @@ class DonationRequestResponse(DonationRequestCreate):
         from_attributes = True
 
 
+# Contact request schemas
+class ContactRequestCreate(BaseModel):
+    donor_id: int
+    message: Optional[str] = Field(None, max_length=500)
+
+
+class ContactRequestResponse(BaseModel):
+    id: int
+    requester_id: int
+    donor_id: int
+    status: str
+    message: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # Message schemas
 class MessageBase(BaseModel):
     """Base message schema"""
@@ -673,15 +724,16 @@ class MessageBase(BaseModel):
 
 class MessageCreate(MessageBase):
     """Schema for creating a message"""
-    pass
+    contact_request_id: Optional[int] = None
 
 
 class MessageResponse(MessageBase):
     """Schema for message response"""
     id: int
+    contact_request_id: Optional[int]
     is_read: bool
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -689,6 +741,80 @@ class MessageResponse(MessageBase):
 class MessageListResponse(BaseModel):
     """Schema for message list"""
     messages: List[MessageResponse]
+
+
+class ChatMessageCreate(BaseModel):
+    content: str = Field(..., max_length=1000)
     
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# NOTIFICATION SCHEMAS
+# ============================================================================
+
+
+class NotificationBase(BaseModel):
+    """Base notification schema"""
+    notification_type: str = Field(..., description="Notification type: 'message', 'request', 'alert', 'system'")
+    title: str = Field(..., max_length=255, description="Notification title")
+    content: str = Field(..., max_length=1000, description="Notification content")
+
+
+class NotificationCreate(NotificationBase):
+    """Schema for creating a notification"""
+    donor_id: int = Field(..., description="Donor ID")
+    requester_id: Optional[int] = Field(None, description="Requester ID (if applicable)")
+
+
+class NotificationResponse(NotificationBase):
+    """Schema for notification response"""
+    id: int
+    donor_id: int
+    requester_id: Optional[int]
+    is_read: bool
+    created_at: datetime
+    read_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationListResponse(BaseModel):
+    """Schema for notification list"""
+    notifications: List[NotificationResponse]
+    total: int
+    unread_count: int
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationMarkAsReadRequest(BaseModel):
+    """Schema for marking notification as read"""
+    notification_id: int = Field(..., description="Notification ID")
+
+
+# ============================================================================
+# USER NOTIFICATION SCHEMAS (all roles)
+# ============================================================================
+
+class UserNotificationResponse(BaseModel):
+    id: int
+    user_id: int
+    notification_type: str
+    title: str
+    content: str
+    is_read: bool
+    created_at: datetime
+    read_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class UserNotificationListResponse(BaseModel):
+    notifications: List[UserNotificationResponse]
+    total: int
+    unread_count: int

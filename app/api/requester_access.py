@@ -1,13 +1,16 @@
 """API endpoints for requester access and donor search"""
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field, EmailStr
 from sqlalchemy.orm import Session
 from app.api.dependencies import get_db, require_role
 from app.core.rate_limiting import limiter
-from app.models import UserRole
+from app.models import UserRole, BloodType
 from app.schemas import (
     CurrentUser,
     RequesterRegister,
+    RequesterCreate,
     RequesterResponse,
     DonorFilterParams,
     DonorSearchResponse,
@@ -15,6 +18,14 @@ from app.schemas import (
     DonationRequestCreate,
     DonationRequestResponse,
 )
+
+
+class RequesterSelfUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=2, max_length=255)
+    phone: Optional[str] = Field(None, max_length=20)
+    address: Optional[str] = Field(None, max_length=500)
+    blood_type_needed: Optional[BloodType] = None
+    urgency: Optional[str] = Field(None, max_length=50)
 from app.services.user_service import UserService
 from app.services.requester_service import RequesterService
 from app.services.donor_service import DonorService
@@ -46,7 +57,14 @@ def register_requester(
 
     profile = RequesterService.create_requester_profile(
         db,
-        requester_data,
+        RequesterCreate(
+            name=requester_data.name,
+            email=requester_data.email,
+            phone=requester_data.phone,
+            address=requester_data.address,
+            blood_type_needed=requester_data.blood_type_needed,
+            urgency=requester_data.urgency,
+        ),
         user_id=user.id,
     )
 
@@ -156,3 +174,58 @@ def list_my_requests(
     if not profile:
         raise HTTPException(status_code=400, detail="Requester profile not found")
     return DonationRequestService.get_requests_by_requester(db, profile.id, skip=skip, limit=limit)
+
+
+@router.get("/profile", response_model=RequesterResponse)
+@limiter.limit("30/minute")
+def get_own_profile(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role(UserRole.REQUESTER)),
+):
+    profile = RequesterService.get_requester_by_user_id(db, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Perfil de solicitante no encontrado")
+    return profile
+
+
+@router.patch("/profile", response_model=RequesterResponse)
+@limiter.limit("10/minute")
+def update_own_profile(
+    body: RequesterSelfUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role(UserRole.REQUESTER)),
+):
+    from app.models import Requester, User
+    profile = RequesterService.get_requester_by_user_id(db, current_user.id)
+    if not profile:
+        # Profile was never created (e.g. registration failed mid-way) — create it now
+        user = db.query(User).filter(User.id == current_user.id).first()
+        update_data = body.model_dump(exclude_unset=True)
+        if not update_data.get("blood_type_needed"):
+            raise HTTPException(
+                status_code=400,
+                detail="Es necesario especificar el tipo de sangre para crear el perfil.",
+            )
+        profile = Requester(
+            user_id=current_user.id,
+            name=update_data.get("name", user.username),
+            email=user.email,
+            phone=update_data.get("phone"),
+            address=update_data.get("address"),
+            blood_type_needed=update_data.get("blood_type_needed"),
+            urgency=update_data.get("urgency", "normal"),
+        )
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+        return profile
+
+    update_data = body.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(profile, field, value)
+    profile.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(profile)
+    return profile

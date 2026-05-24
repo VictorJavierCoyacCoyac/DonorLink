@@ -58,6 +58,8 @@ class Donor(Base):
     age = Column(Integer, nullable=False)
     weight = Column(Float, nullable=False)  # in kg
     last_donation_date = Column(DateTime, nullable=True)
+    last_donation_volume_ml = Column(Float, nullable=True)
+    questionnaire_answers = Column(String(5000), nullable=True)
     approval_status = Column(String(50), nullable=False, default="pending", index=True)  # pending, approved, rejected
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -178,11 +180,28 @@ class DonorQuestionnaire(Base):
         return f"<DonorQuestionnaire(id={self.id}, question_text={self.question_text[:30]}...)>"
 
 
+class ContactRequest(Base):
+    """Contact request from a requester to a donor to establish a chat channel"""
+    __tablename__ = "contact_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    requester_id = Column(Integer, ForeignKey("requesters.id"), nullable=False, index=True)
+    donor_id = Column(Integer, ForeignKey("donors.id"), nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="pending", index=True)  # pending, accepted, rejected
+    message = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<ContactRequest(id={self.id}, requester_id={self.requester_id}, donor_id={self.donor_id}, status={self.status})>"
+
+
 class Message(Base):
     """Message model for internal chat between donors and requesters"""
     __tablename__ = "messages"
 
     id = Column(Integer, primary_key=True, index=True)
+    contact_request_id = Column(Integer, ForeignKey("contact_requests.id"), nullable=True, index=True)
     sender_id = Column(Integer, nullable=False, index=True)  # Can be donor or requester id
     receiver_id = Column(Integer, nullable=False, index=True)  # Can be donor or requester id
     sender_type = Column(String(10), nullable=False)  # "donor" or "requester"
@@ -212,3 +231,55 @@ class AuditLog(Base):
 
     def __repr__(self):
         return f"<AuditLog(id={self.id}, user_id={self.user_id}, action={self.action}, entity_type={self.entity_type}, entity_id={self.entity_id})>"
+
+
+class Notification(Base):
+    """Notification model for donor alerts"""
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    donor_id = Column(Integer, ForeignKey("donors.id"), nullable=False, index=True)
+    requester_id = Column(Integer, ForeignKey("requesters.id"), nullable=True, index=True)
+    notification_type = Column(String(50), nullable=False, index=True)  # "message", "request", "alert", "system"
+    title = Column(String(255), nullable=False)
+    content = Column(String(1000), nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    read_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    donor = relationship("Donor", foreign_keys=[donor_id])
+    requester = relationship("Requester", foreign_keys=[requester_id])
+
+    def __repr__(self):
+        return f"<Notification(id={self.id}, donor_id={self.donor_id}, type={self.notification_type}, title={self.title[:30]}...)>"
+
+
+class UserNotification(Base):
+    """Universal notification for any user role"""
+    __tablename__ = "user_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    notification_type = Column(String(50), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    content = Column(String(1000), nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    read_at = Column(DateTime, nullable=True)
+
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class PasswordResetToken(Base):
+    """Password reset token for account recovery"""
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User", foreign_keys=[user_id])

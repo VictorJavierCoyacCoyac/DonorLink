@@ -24,7 +24,7 @@ import {
 import { Delete as DeleteIcon, Edit as EditIcon, PersonAdd as PersonAddIcon } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import { API_BASE_URL } from '../config/api';
 
 function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -97,13 +97,13 @@ function UserManagement() {
     }
   };
 
-  const openEditDialog = (user) => {
+  const handleOpenEditDialog = (user) => {
     setSelectedUser(user);
     setEditForm({ username: user.username, email: user.email, role: user.role });
     setOpenEditDialog(true);
   };
 
-  const openDeleteDialog = (user) => {
+  const handleOpenDeleteDialog = (user) => {
     setSelectedUser(user);
     setOpenDeleteDialog(true);
   };
@@ -168,12 +168,12 @@ function UserManagement() {
                 </TableCell>
                 <TableCell>
                   <Tooltip title="Editar">
-                    <IconButton onClick={() => openEditDialog(user)} color="primary">
+                    <IconButton onClick={() => handleOpenEditDialog(user)} color="primary">
                       <EditIcon />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Eliminar">
-                    <IconButton onClick={() => openDeleteDialog(user)} color="error">
+                    <IconButton onClick={() => handleOpenDeleteDialog(user)} color="error">
                       <DeleteIcon />
                     </IconButton>
                   </Tooltip>

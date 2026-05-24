@@ -46,4 +46,4 @@ get_db = get_session
 def init_db():
     """Initialize database - create all tables"""
     from app.models import Base
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine) 

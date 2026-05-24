@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import { API_BASE_URL } from '../config/api';
 const ROLE_LABELS = {
   admin: 'Administrador',
   staff: 'Staff',
@@ -145,12 +145,12 @@ function Dashboard() {
     return <Typography sx={{ mt: 10, textAlign: 'center' }}>Cargando dashboard...</Typography>;
   }
 
-  const displayName = user ? (user.username || ROLE_LABELS[user.role] || 'Usuario') : 'Usuario';
-  const displayRole = ROLE_LABELS[user?.role] || 'N/A';
+  const displayName = user ? (user.username || ROLE_LABELS[user.role?.toLowerCase()] || 'Usuario') : 'Usuario';
+  const displayRole = ROLE_LABELS[user?.role?.toLowerCase()] || user?.role || 'N/A';
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, gap: 2 }}>
+    <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 5, gap: 2 }}>
         <Box>
           <Typography variant="h4" gutterBottom>
             Bienvenido, {displayName}
@@ -159,11 +159,11 @@ function Dashboard() {
             Rol activo: <Chip label={displayRole} color="primary" size="small" />
           </Typography>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Button variant="outlined" color="secondary" onClick={handleOpenPasswordDialog}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Button variant="outlined" color="secondary" onClick={handleOpenPasswordDialog} size="small">
             Cambiar contraseña
           </Button>
-          <Button variant="contained" color="error" onClick={handleLogout}>
+          <Button variant="contained" color="error" onClick={handleLogout} size="small">
             Cerrar sesión
           </Button>
         </Box>
@@ -171,128 +171,129 @@ function Dashboard() {
 
       {user?.role === 'admin' ? (
         <>
-          <Paper sx={{ p: 3, mb: 4, backgroundColor: '#f5f7ff' }}>
-            <Typography variant="h6" gutterBottom>
+          <Paper sx={{ p: 4, mb: 6, backgroundColor: '#f5f7ff', borderRadius: 3, boxShadow: 2 }}>
+            <Typography variant="h5" gutterBottom sx={{ fontWeight: 700, mb: 3, color: '#1976d2' }}>
               Privilegios del administrador
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Como admin puedes revisar y aprobar solicitudes, gestionar usuarios y configuración del sistema, y ver métricas de uso y logs.
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <Card
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    minHeight: 140,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      boxShadow: 3,
-                      transform: 'translateY(-2px)',
-                      backgroundColor: '#e3f2fd'
-                    }
-                  }}
-                  component={Link}
-                  to="/admin/applications"
-                >
-                  <Typography variant="subtitle1" gutterBottom>Revisión de solicitudes</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Revisa aplicaciones de nuevos donantes y aprueba o rechaza solicitudes desde el panel.
-                  </Typography>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    minHeight: 140,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      boxShadow: 3,
-                      transform: 'translateY(-2px)',
-                      backgroundColor: '#e3f2fd'
-                    }
-                  }}
-                  component={Link}
-                  to="/admin/users"
-                >
-                  <Typography variant="subtitle1" gutterBottom>Gestión de usuarios</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Administra cuentas de usuarios y roles, activa o desactiva accesos clave.
-                  </Typography>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    minHeight: 140,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      boxShadow: 3,
-                      transform: 'translateY(-2px)',
-                      backgroundColor: '#e3f2fd'
-                    }
-                  }}
-                  component={Link}
-                  to="/admin/config"
-                >
-                  <Typography variant="subtitle1" gutterBottom>Configuración del sistema</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Ajusta parámetros y monitorea el estado general del backend y la base de datos.
-                  </Typography>
-                </Card>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Card
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    minHeight: 140,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      boxShadow: 3,
-                      transform: 'translateY(-2px)',
-                      backgroundColor: '#e3f2fd'
-                    }
-                  }}
-                  component={Link}
-                  to="/admin/audit"
-                >
-                  <Typography variant="subtitle1" gutterBottom>Audit logs</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Consulta los eventos de auditoría e inicios de sesión importantes.
-                  </Typography>
-                </Card>
-              </Grid>
-            </Grid>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2 }}>
+              <Box
+                component={Link}
+                to="/admin/applications"
+                sx={{
+                  p: 2,
+                  textDecoration: 'none',
+                  borderLeft: '4px solid #1976d2',
+                  backgroundColor: '#ffffff',
+                  borderRadius: 1,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: '#e3f2fd',
+                    transform: 'translateX(4px)'
+                  }
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1976d2' }}>
+                  Solicitudes
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Revisar y aprobar donantes
+                </Typography>
+              </Box>
+
+              <Box
+                component={Link}
+                to="/admin/users"
+                sx={{
+                  p: 2,
+                  textDecoration: 'none',
+                  borderLeft: '4px solid #1976d2',
+                  backgroundColor: '#ffffff',
+                  borderRadius: 1,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: '#e3f2fd',
+                    transform: 'translateX(4px)'
+                  }
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1976d2' }}>
+                  Usuarios
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Gestionar roles y acceso
+                </Typography>
+              </Box>
+
+              <Box
+                component={Link}
+                to="/admin/config"
+                sx={{
+                  p: 2,
+                  textDecoration: 'none',
+                  borderLeft: '4px solid #1976d2',
+                  backgroundColor: '#ffffff',
+                  borderRadius: 1,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: '#e3f2fd',
+                    transform: 'translateX(4px)'
+                  }
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1976d2' }}>
+                  Configuración
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Parámetros del sistema
+                </Typography>
+              </Box>
+
+              <Box
+                component={Link}
+                to="/admin/audit"
+                sx={{
+                  p: 2,
+                  textDecoration: 'none',
+                  borderLeft: '4px solid #1976d2',
+                  backgroundColor: '#ffffff',
+                  borderRadius: 1,
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    backgroundColor: '#e3f2fd',
+                    transform: 'translateX(4px)'
+                  }
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1976d2' }}>
+                  Auditoría
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Ver eventos del sistema
+                </Typography>
+              </Box>
+            </Box>
           </Paper>
 
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 4 }}>
-            <Button component={Link} to="/admin/applications" variant="contained" color="primary">
-              Ver solicitudes de donantes
+          {/* Action Buttons */}
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 6, justifyContent: 'center' }}>
+            <Button component={Link} to="/admin/applications" variant="contained" color="primary" size="large">
+              📋 Ver Solicitudes
             </Button>
-            <Button component={Link} to="/admin/donors" variant="contained" color="secondary">
-              Gestionar Donantes
+            <Button component={Link} to="/admin/donors" variant="contained" color="secondary" size="large">
+              💉 Gestionar Donantes
             </Button>
-            <Button component={Link} to="/admin/users" variant="outlined" color="primary">
-              Gestionar Usuarios
+            <Button component={Link} to="/admin/users" variant="outlined" color="primary" size="large">
+              👥 Gestionar Usuarios
             </Button>
-            <Button component={Link} to="/admin/config" variant="outlined" color="primary">
-              Configuración del Sistema
+            <Button component={Link} to="/admin/config" variant="outlined" color="primary" size="large">
+              ⚙️ Configuración
             </Button>
-            <Button component={Link} to="/admin/audit" variant="outlined" color="primary">
-              Ver Audit Logs
+            <Button component={Link} to="/admin/audit" variant="outlined" color="primary" size="large">
+              📊 Ver Logs
             </Button>
           </Box>
 
-          <Typography variant="h5" gutterBottom>Resumen del sistema</Typography>
+          <Typography variant="h5" gutterBottom sx={{ mt: 6, mb: 3 }}>Resumen del sistema</Typography>
           <Grid container spacing={3}>
             {metrics ? (
               [

@@ -1,4 +1,8 @@
 """Authentication endpoints"""
+import hashlib
+import secrets
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -13,13 +17,17 @@ from app.schemas import (
     UserResponse,
     CurrentUser,
     PasswordChangeRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
     UserUpdate,
     DonorRegister,
     DonorResponse,
 )
+from app.models import PasswordResetToken
 from app.services.user_service import UserService
 from app.services.donor_service import DonorService
 from app.services.audit_service import AuditService
+from app.services.email_service import EmailService
 from app.core.security import SecurityService, TOKEN_TYPE_REFRESH, TOKEN_TYPE_ACCESS
 from app.utils.request_helper import get_client_ip
 
@@ -239,6 +247,89 @@ def change_password(
     )
 
     return {"message": "Contraseña actualizada correctamente"}
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    """
+    Request a password reset email.
+
+    Always returns 200 to avoid leaking whether the email exists.
+    """
+    user = UserService.get_user_by_email(db, payload.email)
+    if user and user.is_active:
+        # Invalidate any existing unused tokens for this user
+        db.query(PasswordResetToken).filter(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        ).delete()
+        db.commit()
+
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        reset_token = PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=datetime.utcnow() + timedelta(hours=1),
+        )
+        db.add(reset_token)
+        db.commit()
+
+        EmailService.send_password_reset(user.email, user.username, raw_token)
+
+        AuditService.log_action(
+            db=db,
+            user_id=user.id,
+            action="password_reset_requested",
+            entity_type="user",
+            entity_id=user.id,
+            description=f"Password reset requested for {user.email}",
+            ip_address=get_client_ip(request),
+        )
+
+    return {"message": "Si el email existe, recibirás un enlace para restablecer tu contraseña."}
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+def reset_password(payload: ResetPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    """Reset password using a token received via email."""
+    token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
+
+    reset_token = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == token_hash,
+        PasswordResetToken.used_at.is_(None),
+    ).first()
+
+    if not reset_token or reset_token.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El enlace de recuperación es inválido o ha expirado.",
+        )
+
+    user = UserService.get_user_by_id(db, reset_token.user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuario no encontrado.")
+
+    updates = UserUpdate(password=payload.new_password)
+    UserService.update_user(db, user.id, updates)
+
+    reset_token.used_at = datetime.utcnow()
+    db.commit()
+
+    AuditService.log_action(
+        db=db,
+        user_id=user.id,
+        action="password_reset_completed",
+        entity_type="user",
+        entity_id=user.id,
+        description=f"Password reset completed for {user.email}",
+        ip_address=get_client_ip(request),
+    )
+
+    return {"message": "Contraseña restablecida correctamente. Ya puedes iniciar sesión."}
 
 
 @router.post("/logout")

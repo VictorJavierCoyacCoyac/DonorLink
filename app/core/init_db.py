@@ -1,7 +1,8 @@
 """Data initialization script for development and testing"""
+import os
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from app.models import Donor, BloodType, User, UserRole, Requester, SystemConfig
+from app.models import Donor, BloodType, User, UserRole, Requester, SystemConfig, DonorQuestionnaire
 from app.core.security import SecurityService
 from app.services.user_service import UserService
 
@@ -28,7 +29,9 @@ def init_admin_user(db: Session):
 
 def init_sample_data(db: Session):
     """Initialize sample donor data for testing"""
-    
+    if os.getenv("DATABASE_URL", "").startswith("postgresql"):
+        return  # skip sample data in production
+
     # Check if data already exists
     if db.query(Donor).count() > 0:
         return
@@ -140,3 +143,78 @@ def init_sample_data(db: Session):
         db.add_all(sample_configs)
         db.commit()
         print(f"✓ Initialized {len(sample_configs)} default system configurations")
+
+
+def init_questionnaire(db: Session):
+    """Initialize default health questionnaire questions for donor registration"""
+    
+    # Check if questions already exist
+    if db.query(DonorQuestionnaire).count() > 0:
+        return
+    
+    questions = [
+        DonorQuestionnaire(
+            question_text="¿Tienes antecedentes de anemia o problemas de hemoglobina?",
+            question_type="yes_no",
+            is_active=True,
+            sort_order=1,
+        ),
+        DonorQuestionnaire(
+            question_text="¿Has estado diagnosticado con alguna enfermedad de transmisión sexual en los últimos 12 meses?",
+            question_type="yes_no",
+            is_active=True,
+            sort_order=2,
+        ),
+        DonorQuestionnaire(
+            question_text="¿Has viajado a zonas con malaria, dengue o Zika en los últimos 6 meses?",
+            question_type="yes_no",
+            is_active=True,
+            sort_order=3,
+        ),
+        DonorQuestionnaire(
+            question_text="¿Padeces de hipertensión arterial o presión arterial alta?",
+            question_type="yes_no",
+            is_active=True,
+            sort_order=4,
+        ),
+        DonorQuestionnaire(
+            question_text="¿Has recibido alguna vacuna en los últimos 7 días?",
+            question_type="yes_no",
+            is_active=True,
+            sort_order=5,
+        ),
+        DonorQuestionnaire(
+            question_text="¿Tienes alergias conocidas a medicamentos o proteínas de sangre?",
+            question_type="yes_no",
+            is_active=True,
+            sort_order=6,
+        ),
+        DonorQuestionnaire(
+            question_text="¿Has donado sangre anteriormente? Si es así, ¿cuándo fue la última donación?",
+            question_type="text",
+            is_active=True,
+            sort_order=7,
+        ),
+        DonorQuestionnaire(
+            question_text="¿Actualmente estás tomando algún medicamento? Si es así, ¿cuál?",
+            question_type="text",
+            is_active=True,
+            sort_order=8,
+        ),
+        DonorQuestionnaire(
+            question_text="¿Tienes antecedentes de cáncer o quimioterapia?",
+            question_type="yes_no",
+            is_active=True,
+            sort_order=9,
+        ),
+        DonorQuestionnaire(
+            question_text="¿Has tenido contacto cercano con personas diagnosticadas con COVID-19 en los últimos 14 días?",
+            question_type="yes_no",
+            is_active=True,
+            sort_order=10,
+        ),
+    ]
+    
+    db.add_all(questions)
+    db.commit()
+    print(f"✓ Initialized {len(questions)} donor questionnaire questions")

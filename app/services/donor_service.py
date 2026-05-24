@@ -1,6 +1,7 @@
 """Service for donor-related operations"""
 from typing import Optional, List
 from datetime import datetime
+import json
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import and_, or_, func
@@ -59,7 +60,8 @@ class DonorService:
             blood_type=donor_data.blood_type,
             age=donor_data.age,
             weight=donor_data.weight,
-            approval_status="pending",  # Pending admin approval
+            questionnaire_answers=json.dumps(donor_data.questionnaire_answers, default=str) if donor_data.questionnaire_answers else None,
+            approval_status="pending",  # Requires admin approval
         )
         db.add(donor)
         db.commit()
@@ -139,6 +141,11 @@ class DonorService:
     def get_donor_by_email(db: Session, email: str) -> Optional[Donor]:
         """Get a donor by email"""
         return db.query(Donor).filter(Donor.email == email).first()
+    
+    @staticmethod
+    def get_donor_by_user_id(db: Session, user_id: int) -> Optional[Donor]:
+        """Get a donor by user ID"""
+        return db.query(Donor).filter(Donor.user_id == user_id).first()
     
     @staticmethod
     def get_all_donors(db: Session, skip: int = 0, limit: int = 100) -> List[Donor]:
@@ -289,7 +296,8 @@ class DonorService:
             donation_date=datetime.utcnow(),
         )
         donor.last_donation_date = donation.donation_date
-        
+        donor.last_donation_volume_ml = volume_ml
+
         db.add(donation)
         db.commit()
         db.refresh(donation)

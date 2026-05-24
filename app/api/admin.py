@@ -1,5 +1,8 @@
 """Admin endpoints for user management, system configuration, and monitoring"""
+import csv
+import io
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -201,6 +204,40 @@ def delete_user(
 # ---------------------------------------------------------------------------
 
 
+@router.get("/donors/export")
+@limiter.limit("10/minute")
+def export_donors_csv(
+    request: Request,
+    status: str = Query("approved", description="Filter by approval status"),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role(UserRole.ADMIN)),
+):
+    """Export approved donors as CSV"""
+    from app.models import Donor
+    donors = db.query(Donor).filter(Donor.approval_status == status).order_by(Donor.name).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Nombre", "Email", "Teléfono", "Dirección", "Tipo de Sangre", "Edad", "Peso (kg)", "Última Donación", "Estado", "Fecha Registro"])
+    for d in donors:
+        bt = str(d.blood_type).replace("BloodType.", "").replace("_POSITIVE", "+").replace("_NEGATIVE", "-").replace("_", "")
+        writer.writerow([
+            d.id, d.name, d.email, d.phone or "", d.address or "",
+            bt, d.age, d.weight,
+            d.last_donation_date.strftime("%Y-%m-%d") if d.last_donation_date else "",
+            d.approval_status,
+            d.created_at.strftime("%Y-%m-%d"),
+        ])
+
+    output.seek(0)
+    filename = f"donantes_{status}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/donors/pending", response_model=List[DonorResponse])
 @limiter.limit("30/minute")
 def list_pending_donors(
@@ -229,6 +266,13 @@ def approve_donor(
         donor = DonorService.approve_donor(db, donor_id, admin_user_id=current_user.id, ip_address=get_client_ip(request))
         if not donor:
             raise HTTPException(status_code=404, detail="Donor not found")
+        if donor.user_id:
+            from app.services.notification_service import NotificationService
+            NotificationService.notify_user(
+                db=db, user_id=donor.user_id, notification_type="system",
+                title="¡Tu solicitud fue aprobada!",
+                content=f"Hola {donor.name}, tu registro como donante ha sido aprobado. Ya puedes recibir solicitudes de donación.",
+            )
         return donor
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -247,6 +291,13 @@ def reject_donor(
         donor = DonorService.reject_donor(db, donor_id, admin_user_id=current_user.id, ip_address=get_client_ip(request))
         if not donor:
             raise HTTPException(status_code=404, detail="Donor not found")
+        if donor.user_id:
+            from app.services.notification_service import NotificationService
+            NotificationService.notify_user(
+                db=db, user_id=donor.user_id, notification_type="alert",
+                title="Tu solicitud no fue aprobada",
+                content=f"Hola {donor.name}, lamentablemente tu registro como donante no pudo ser aprobado en este momento. Puedes contactar al administrador para más información.",
+            )
         return donor
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

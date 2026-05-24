@@ -22,7 +22,7 @@ import {
 import { Search as SearchIcon } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import { API_BASE_URL } from '../config/api';
 
 function AuditLogs() {
   const [logs, setLogs] = useState([]);

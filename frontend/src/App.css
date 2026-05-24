@@ -1,3 +1,16 @@
+/* Global Styles */
+* {
+  scroll-behavior: smooth;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  scroll-behavior: smooth;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;

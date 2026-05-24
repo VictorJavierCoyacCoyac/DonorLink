@@ -23,7 +23,7 @@ import {
 import { Edit as EditIcon, Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import { API_BASE_URL } from '../config/api';
 
 function SystemConfig() {
   const [configs, setConfigs] = useState([]);
@@ -96,13 +96,13 @@ function SystemConfig() {
     }
   };
 
-  const openEditDialog = (config) => {
+  const handleOpenEditDialog = (config) => {
     setSelectedConfig(config);
     setEditForm({ key: config.key, value: config.value, description: config.description || '' });
     setOpenEditDialog(true);
   };
 
-  const openDeleteDialog = (config) => {
+  const handleOpenDeleteDialog = (config) => {
     setSelectedConfig(config);
     setOpenDeleteDialog(true);
   };
@@ -145,12 +145,12 @@ function SystemConfig() {
                 <TableCell>{config.description || 'Sin descripción'}</TableCell>
                 <TableCell>
                   <Tooltip title="Editar">
-                    <IconButton onClick={() => openEditDialog(config)} color="primary">
+                    <IconButton onClick={() => handleOpenEditDialog(config)} color="primary">
                       <EditIcon />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Eliminar">
-                    <IconButton onClick={() => openDeleteDialog(config)} color="error">
+                    <IconButton onClick={() => handleOpenDeleteDialog(config)} color="error">
                       <DeleteIcon />
                     </IconButton>
                   </Tooltip>
